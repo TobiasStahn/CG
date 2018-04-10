@@ -1,0 +1,227 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.slidecontainer {
+	width: 500px;
+}
+
+.slider {
+	-webkit-appearance: none;
+	width: 100%;
+	height: 10px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="myCanvas" width="500" height="500" style="border:1px solid #d3d3d3;">
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+<div class="slidecontainer">
+	<p>X Translation: <span id="transXValue"></span></p>
+	<input type="range" min="-500" max="500" value="0" class="slider" id="transX">
+</div>
+
+<div class="slidecontainer">
+	<p>Y Translation: <span id="transYValue"></span></p>
+	<input type="range" min="-500" max="500" value="0" class="slider" id="transY">
+</div>
+
+<div class="slidecontainer">
+	<p>X Scale: <span id="scaleXValue"></span></p>
+	<input type="range" min="-5" max="5" step="0.05" value="1" class="slider" id="scaleX">
+</div>
+
+<div class="slidecontainer">
+	<p>Y Scale: <span id="scaleYValue"></span></p>
+	<input type="range" min="-5" max="5" step="0.05" value="1" class="slider" id="scaleY">
+</div>
+
+<div class="slidecontainer">
+    <p>Rotation: <span id="rotValue"></span></p>
+    <input type="range" min="-180" max="180" value="0" class="slider" id="rot">
+</div>
+
+
+<script type="text/javascript">
+    const size = 500; // Size of canvas
+    var c = document.getElementById("myCanvas");
+    var ctx = c.getContext("2d");
+
+
+    // 2d point prototype
+    function Point2D (x=0, y=0)  {
+        this.x = x;
+        this.y = y;
+        this.w = 1;
+    }
+
+    // 3d matrix protoype
+    function Matrix3D (xx=0, yx=0, zx=0, xy=0, yy=0, zy=0, xz=0, yz=0, zz=0) {
+        this.xx = xx;
+        this.yx = yx;
+        this.zx = zx;
+        this.xy = xy;
+        this.yy = yy;
+        this.zy = zy;
+        this.xz = xz;
+        this.yz = yz;
+        this.zz = zz;
+
+        // matrix multiplication
+        this.mulMat = function (m) {
+            var n = new Matrix3D ();
+            n.xx = m.xx * this.xx + m.xy * this.yx + m.xz * this.zx;
+            n.xy = m.xx * this.xy + m.xy * this.yy + m.xz * this.zy;
+            n.xz = m.xx * this.xz + m.xy * this.yz + m.xz * this.zz;
+            n.yx = m.yx * this.xx + m.yy * this.yx + m.yz * this.zx;
+            n.yy = m.yx * this.xy + m.yy * this.yy + m.yz * this.zy;
+            n.yz = m.yx * this.xz + m.yy * this.yz + m.yz * this.zz;
+            n.zx = m.zx * this.xx + m.zy * this.yx + m.zz * this.zx;
+            n.zy = m.zx * this.xy + m.zy * this.yy + m.zz * this.zy;
+            n.zz = m.zx * this.xz + m.zy * this.yz + m.zz * this.zz;
+            return n;
+        }
+
+        // matrix vector product
+        this.mulVec = function (pIn) {
+            var p = new Point2D();
+            p.x = pIn.x * this.xx + pIn.y * this.yx + pIn.w * this.zx;
+            p.y = pIn.x * this.xy + pIn.y * this.yy + pIn.w * this.zy;
+            p.w = pIn.x * this.xz + pIn.y * this.yz + pIn.w * this.zz;
+            return p;
+        }   
+    }
+
+
+    // Draw point at x,y with given color and radius
+    function drawPoint (point, hexcolor='#000000', radius=1) {
+        ctx.beginPath();
+        ctx.arc(point.x + 0.5*size, point.y + 0.5*size, radius, 0, 2 * Math.PI, false);
+        ctx.fillStyle = hexcolor;
+        ctx.fill();
+    }
+
+
+    // Draw array of points
+    function drawPoints (pointarray) {
+        var radius = 0.004 * size;
+        var color = '#000000';
+        for (var i = 0; i < pointarray.length; i++) {
+            drawPoint(pointarray[i], color, radius);
+        }
+    }
+
+
+    // Create array of points
+    var pointarray = [];
+    function createPoints () {
+// BEGIN AUFGABE 1
+        return pointarray;
+    }
+
+
+    // create and update transformation matrix
+    var transX = 0;
+    var transY = 0;
+    var scalingX = 1;
+    var scalingY = 1;
+    var rot = 0;
+    var transMat = new Matrix3D(1, 0, 0,
+                                0, 1, 0,
+                                0, 0, 1);
+    function updateTransMat() {
+// BEGIN AUFGABE 2
+    }
+
+
+    // transform points
+    var transPoints = [];
+    function transformPoints() {
+        transPoints = [];
+        for (var i = 0; i < pointarray.length; i++) {
+            var transPoint = transMat.mulVec(pointarray[i]);
+            transPoints.push(transPoint);
+        }
+    }
+
+
+    // update canvas
+    function updateCanvas() {
+        transformPoints();
+        ctx.clearRect(0, 0, size, size);
+        drawPoints(transPoints);
+    }
+
+
+    // slider functionality
+    var sliderTransX = document.getElementById("transX");
+    var sliderTransY = document.getElementById("transY");
+    var sliderScaleX = document.getElementById("scaleX");
+    var sliderScaleY = document.getElementById("scaleY");
+    var sliderRot = document.getElementById("rot");
+    var dispTransX = document.getElementById("transXValue");
+    var dispTransY = document.getElementById("transYValue");
+    var dispScaleX = document.getElementById("scaleXValue");
+    var dispScaleY = document.getElementById("scaleYValue");
+    var dispRot = document.getElementById("rotValue");
+    dispTransX.innerHTML = transX;
+    dispTransY.innerHTML = transY;
+    dispScaleX.innerHTML = scalingX;
+    dispScaleY.innerHTML = scalingY;
+    dispRot.innerHTML = rot;
+    sliderTransX.oninput = function() {
+        transX = this.value;
+        dispTransX.innerHTML = transX;
+        updateTransMat();
+        updateCanvas();
+    }
+    sliderTransY.oninput = function() {
+        transY = this.value;
+        dispTransY.innerHTML = transY;
+        updateTransMat();
+        updateCanvas();
+    }
+    sliderScaleX.oninput = function() {
+        scalingX = this.value;
+        dispScaleX.innerHTML = scalingX;
+        updateTransMat();
+        updateCanvas();
+    }
+    sliderScaleY.oninput = function() {
+        scalingY = this.value;
+        dispScaleY.innerHTML = scalingY;
+        updateTransMat();
+        updateCanvas();
+        }
+    sliderRot.oninput = function() {
+        rot = this.value;
+        dispRot.innerHTML = rot;
+        updateTransMat();
+        updateCanvas();
+    }
+
+
+    // set correct sizes 
+    function setSizes () {
+        document.getElementById("myCanvas").setAttribute("width", size); 
+        document.getElementById("myCanvas").setAttribute("height", size); 
+        document.getElementById("transX").setAttribute("min", -size);
+        document.getElementById("transX").setAttribute("max", size);
+        document.getElementById("transY").setAttribute("min", -size);
+        document.getElementById("transY").setAttribute("max", size);
+    }
+        
+
+    // create points and init canvas
+    setSizes();
+    createPoints();
+    updateTransMat();
+    updateCanvas();
+
+</script> 
+
+</body>
+</html>
