@@ -47,15 +47,17 @@ Your browser does not support the HTML5 canvas tag.</canvas>
 
 <script type="text/javascript">
     const size = 500; // Size of canvas
+    const MAX = 20;
     var c = document.getElementById("myCanvas");
     var ctx = c.getContext("2d");
 
 
     // 2d point prototype
-    function Point2D (x=0, y=0)  {
+    function Point2D (x=0, y=0, color='#000000')  {
         this.x = x;
         this.y = y;
         this.w = 1;
+        this.color = color;
     }
 
     // 3d matrix protoype
@@ -91,16 +93,17 @@ Your browser does not support the HTML5 canvas tag.</canvas>
             p.x = pIn.x * this.xx + pIn.y * this.yx + pIn.w * this.zx;
             p.y = pIn.x * this.xy + pIn.y * this.yy + pIn.w * this.zy;
             p.w = pIn.x * this.xz + pIn.y * this.yz + pIn.w * this.zz;
+            p.color = pIn.color;
             return p;
-        }   
+        }
     }
 
 
     // Draw point at x,y with given color and radius
-    function drawPoint (point, hexcolor='#000000', radius=1) {
+    function drawPoint (point, radius=1) {
         ctx.beginPath();
         ctx.arc(point.x + 0.5*size, point.y + 0.5*size, radius, 0, 2 * Math.PI, false);
-        ctx.fillStyle = hexcolor;
+        ctx.fillStyle = point.color;
         ctx.fill();
     }
 
@@ -108,9 +111,8 @@ Your browser does not support the HTML5 canvas tag.</canvas>
     // Draw array of points
     function drawPoints (pointarray) {
         var radius = 0.004 * size;
-        var color = '#000000';
         for (var i = 0; i < pointarray.length; i++) {
-            drawPoint(pointarray[i], color, radius);
+            drawPoint(pointarray[i], radius);
         }
     }
 
@@ -118,7 +120,18 @@ Your browser does not support the HTML5 canvas tag.</canvas>
     // Create array of points
     var pointarray = [];
     function createPoints () {
-// BEGIN AUFGABE 1
+        for (var i = -MAX; i <= MAX; i += 5)
+        {
+            var color1 = '#FFD700';
+            var color2 = '#FF4500';
+            var color = i % 10 ? color1 : color2;
+
+            pointarray.push(new Point2D(i, MAX, color));
+            pointarray.push(new Point2D(MAX, i, color));
+            pointarray.push(new Point2D(i, -MAX, color));
+            pointarray.push(new Point2D(-MAX, i, color));
+        }
+
         return pointarray;
     }
 
@@ -133,7 +146,19 @@ Your browser does not support the HTML5 canvas tag.</canvas>
                                 0, 1, 0,
                                 0, 0, 1);
     function updateTransMat() {
-// BEGIN AUFGABE 2
+
+        var translationMat  = new Matrix3D(1, 0, transX,
+                                           0, 1, transY,
+                                           0, 0, 1);
+        var scalingMat      = new Matrix3D(scalingX, 0, 0,
+                                           0, scalingY, 0,
+                                           0, 0, 1);
+
+        var rotationMat     = new Matrix3D(Math.cos(rot * (Math.PI / 180)), -Math.sin(rot * (Math.PI / 180)), 0,
+                                           Math.sin(rot * (Math.PI / 180)), Math.cos(rot * (Math.PI / 180)), 0,
+                                           0, 0, 1);
+
+        transMat = rotationMat.mulMat(translationMat.mulMat(scalingMat));
     }
 
 
