@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.slidecontainer {
+	width: 500px;
+}
+
+.slider {
+	-webkit-appearance: none;
+	width: 100%;
+	height: 10px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="myCanvas" width="500" height="500" style="border:1px solid #d3d3d3;" 
+    onmousedown="mouse_action(event, 1)" onmouseup="mouse_action(event, -1)"
+    onmousemove="mouse_action(event, 0)">
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+<div class="slidecontainer">
+<p>Rotation X: <span id="rotValueX"></span></p>
+    <input type="range" min="-180" max="180" value="0" class="slider" id="rotX">
+</div>
+
+<div class="slidecontainer">
+<p>Rotation Y: <span id="rotValueY"></span></p>
+    <input type="range" min="-180" max="180" value="0" class="slider" id="rotY">
+</div>
+
+<div class="slidecontainer">
+<p>Rotation Z: <span id="rotValueZ"></span></p>
+    <input type="range" min="-180" max="180" value="0" class="slider" id="rotZ">
+</div>
+    
+<div class="slidecontainer">
+<p>Camera Z Position: <span id="camPosZ"></span></p>
+    <input type="range" min="100" max="1000" value="300" class="slider" id="camZ">
+</div>
+
+
+<script type="text/javascript">
+    const size = 500; // Size of canvas
+    var c = document.getElementById("myCanvas");
+    var ctx = c.getContext("2d");
+
+    // 3dpoint prototype
+    function Point3D (x=0, y=0, z=0, w=1)  {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+
+        // dehomogenize point
+        this.dehomogen = function () {
+            var p = new Point3D();
+            p.x = this.x/this.w;
+            p.y = this.y/this.w;
+            p.z = this.z/this.w;
+            p.w = 1;
+            return p;
+        }
+    }
+
+    // 3d vector
+    function Vector3D (x=0, y=0, z=0)  {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+
+        // matrix vector product
+        this.cross = function (v) {
+            var c = new Vector3D();
+            c.x = this.y * v.z - this.z * v.y;
+            c.y = this.z * v.x - this.x * v.z;
+            c.z = this.x * v.y - this.y * v.x;
+            return c;
+        }   
+
+        // normalize vector
+        this.normalize = function() {
+            var norm = Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z);
+            var v = new Vector3D(this.x/norm, this.y/norm, this.z/norm);
+            return v;
+        }
+
+        // dot product
+        this.dot = function (v) {
+            return this.x * v.x + this.y * v.y + this.z * v.z;
+        }
+    }
+
+    // 4d matrix protoype
+    function Matrix4D (xx = 1, yx = 0, zx = 0, wx = 0,
+                       xy = 0, yy = 1, zy = 0, wy = 0,
+                       xz = 0, yz = 0, zz = 1, wz = 0,
+                       xw = 0, yw = 0, zw = 0, ww = 1) {
+        this.xx = xx;
+        this.yx = yx;
+        this.zx = zx;
+        this.wx = wx;
+        this.xy = xy;
+        this.yy = yy;
+        this.zy = zy;
+        this.wy = wy;
+        this.xz = xz;
+        this.yz = yz;
+        this.zz = zz;
+        this.wz = wz;
+        this.xw = xw;
+        this.yw = yw;
+        this.zw = zw;
+        this.ww = ww;
+        // matrix multiplication
+        this.mulMat = function (m) {
+            var n = new Matrix4D ();
+            n.xx = m.xx * this.xx + m.xy * this.yx + m.xz * this.zx + m.xw * this.wx;
+            n.xy = m.xx * this.xy + m.xy * this.yy + m.xz * this.zy + m.xw * this.wy;
+            n.xz = m.xx * this.xz + m.xy * this.yz + m.xz * this.zz + m.xw * this.wz;
+            n.xw = m.xx * this.xw + m.xy * this.yw + m.xz * this.zw + m.xw * this.ww;
+            n.yx = m.yx * this.xx + m.yy * this.yx + m.yz * this.zx + m.yw * this.wx;
+            n.yy = m.yx * this.xy + m.yy * this.yy + m.yz * this.zy + m.yw * this.wy;
+            n.yz = m.yx * this.xz + m.yy * this.yz + m.yz * this.zz + m.yw * this.wz;
+            n.yw = m.yx * this.xw + m.yy * this.yw + m.yz * this.zw + m.yw * this.ww;
+            n.zx = m.zx * this.xx + m.zy * this.yx + m.zz * this.zx + m.zw * this.wx;
+            n.zy = m.zx * this.xy + m.zy * this.yy + m.zz * this.zy + m.zw * this.wy;
+            n.zz = m.zx * this.xz + m.zy * this.yz + m.zz * this.zz + m.zw * this.wz;
+            n.zw = m.zx * this.xw + m.zy * this.yw + m.zz * this.zw + m.zw * this.ww;
+            n.wx = m.wx * this.xx + m.wy * this.yx + m.wz * this.zx + m.ww * this.wx;
+            n.wy = m.wx * this.xy + m.wy * this.yy + m.wz * this.zy + m.ww * this.wy;
+            n.wz = m.wx * this.xz + m.wy * this.yz + m.wz * this.zz + m.ww * this.wz;
+            n.ww = m.wx * this.xw + m.wy * this.yw + m.wz * this.zw + m.ww * this.ww;
+            return n;
+        }
+
+        // matrix vector product
+        this.mulVec = function (pIn) {
+            var p = new Point3D();
+            p.x = pIn.x * this.xx + pIn.y * this.yx + pIn.z * this.zx + pIn.w * this.wx;
+            p.y = pIn.x * this.xy + pIn.y * this.yy + pIn.z * this.zy + pIn.w * this.wy;
+            p.z = pIn.x * this.xz + pIn.y * this.yz + pIn.z * this.zz + pIn.w * this.wz;
+            p.w = pIn.x * this.xw + pIn.y * this.yw + pIn.z * this.zw + pIn.w * this.ww;
+            return p;
+        }   
+    }
+
+
+    // Draw point at x,y with given color and radius
+    function drawPoint (x, y, hexcolor='#000000', radius=1) {
+        ctx.beginPath();
+        ctx.arc(x + 0.5*size, y + 0.5*size, radius, 0, 2 * Math.PI, false);
+        ctx.fillStyle = hexcolor;
+        ctx.fill();
+    }
+
+
+    // Create array of points
+    var pointarray = [];
+    function createPoints () {
+// BEGIN AUFGABE a
+		pointarray.push(new Point3D(0.5,0.5,0.5,1));
+		pointarray.push(new Point3D(-0.5,0.5,0.5,1));
+		pointarray.push(new Point3D(0.5,0.5,-0.5,1));
+		pointarray.push(new Point3D(-0.5,0.5,-0.5,1));
+		pointarray.push(new Point3D(0.5,-0.5,0.5,1));
+		pointarray.push(new Point3D(-0.5,-0.5,0.5,1));
+		pointarray.push(new Point3D(0.5,-0.5,-0.5,1));
+		pointarray.push(new Point3D(-0.5,-0.5,-0.5,1));
+// END AUFGABE a
+    }
+
+
+    var rotX = 0;
+    var rotY = 0;
+    var rotZ = 0;
+    var camZ = 3;
+    // transform array of points
+    function transformPoints (pointarray) {
+        
+        var transMat = new Matrix4D(1,0,0,0,
+                                    0,1,0,0,
+                                    0,0,1,0,
+                                    0,0,0,1);
+        
+// BEGIN AUFGABE b
+	
+
+
+    var xrotMat = new Matrix4D(Math.cos(rotX*Math.PI/180),-Math.sin(rotX*Math.PI/180),0,0,
+                               Math.sin(rotX*Math.PI/180),Math.cos(rotX*Math.PI/180),0,0,
+                               0,0,1,0,
+                               0,0,0,1);
+							   
+	var yrotMat = new Matrix4D(1,0,0,0,
+                               0,Math.cos(rotY*Math.PI/180),-Math.sin(rotY*Math.PI/180),0,
+                               0,Math.sin(rotY*Math.PI/180),Math.cos(rotY*Math.PI/180),0,
+                               0,0,0,1);
+							   
+	var zrotMat = new Matrix4D(Math.cos(rotZ*Math.PI/180),0,Math.sin(rotZ*Math.PI/180),0,
+                               0,1,0,0,
+                               -Math.sin(rotZ*Math.PI/180),0,Math.cos(rotZ*Math.PI/180),0,
+                               0,0,0,1);
+	transMat = transMat.mulMat(xrotMat.mulMat(yrotMat.mulMat(zrotMat)));
+	
+	var c = new Point3D(0,0,camZ,1);
+	var r = new Vector3D(1,0,0);
+	var u = new Vector3D(0,1,0);
+	var d = new Vector3D(0,0,-1);
+	
+	var lookAtMat = new Matrix4D(1,0,0,-r.dot(c),
+								 0,1,0, -u.dot(c),
+								 0,0,-(-1),d.dot(c),
+								 0,0,0,1);
+	transMat = transMat.mulMat(lookAtMat);
+// END AUFGABE b
+        
+        var pointsTrans = [];
+        for (var i = 0; i < pointarray.length; i++) {
+            var point = pointarray[i];
+            var pointTrans = transMat.mulVec(point);
+            pointsTrans.push(pointTrans);
+        }
+        
+        return pointsTrans;
+    }
+
+
+    // project array of points
+    function projectPoints (pointarray) { 
+        var projMat = new Matrix4D(1,0,0,0,
+                                   0,1,0,0,
+                                   0,0,0,0,
+                                   0,0,0,1);
+        
+        var pointsProj = [];
+        
+// BEGINN AUFGABE c
+
+		var stdMat = new Matrix4D(1,0,0,0,
+                                   0,1,0,0,
+                                   0,0,1,0,
+                                   0,0,-1,0);
+								   
+		var skalMat = new Matrix4D(size/3,0,0,0,
+                                   0,size/3,0,0,
+                                   0,0,0,0,
+                                   0,0,0,1);
+								   
+		projMat = skalMat.mulMat(stdMat);
+		
+        for (var i = 0; i < pointarray.length; i++) {
+            var point = pointarray[i];
+            pointsProj[i] = projMat.mulVec(point);
+            
+        }     
+// END AUFGABE c
+
+        return pointsProj;
+    }
+
+
+    // draw points in pointarray
+    function drawPoints (pointarray) {
+        for (var i = 0; i < pointarray.length; i++) {
+            var point = pointarray[i];
+            var hexcolor = "#000000";
+            drawPoint(point.x, point.y, hexcolor, 2);
+        }
+    }
+
+
+    // update canvas
+    function updateCanvas () {
+        ctx.clearRect(0, 0, size, size);
+        var pointsTrans = transformPoints(pointarray);
+        var pointsProj = projectPoints(pointsTrans);
+        drawPoints(pointsProj);
+    }
+        
+
+    // mouse funcionality
+    var mouseDown = false;
+    var mouseXOld = 0;
+    var mouseYOld = 0;
+    var mouseRotMat = new Matrix4D();
+    function mouse_action(event, clicked) {
+        if (clicked == 1) {
+            mouseDown = true;
+            mouseXOld = event.clientX;
+            mouseYOld = event.clientY;
+        } else if ( clicked == -1) {
+            mouseDown = false;
+        }
+
+        if (mouseDown) {
+            var mouseX = event.clientX;
+            var mouseY = event.clientY;
+            // check if mouse movement is at least one pixel of canvas
+            if ((mouseX != mouseXOld) || (mouseY != mouseYOld)) {
+                var x1 = mouseXOld - 0.5*size;
+                var y1 = mouseYOld - 0.5*size; 
+                var x2 = mouseX - 0.5*size;
+                var y2 = mouseY - 0.5*size;
+// BEGIN BONUS
+
+// END BONUS
+                updateCanvas();
+                mouseXOld = mouseX;
+                mouseYOld = mouseY;
+            }
+        }
+    }
+
+
+    // slider functionality
+    var sliderRotX = document.getElementById("rotX");
+    var sliderRotY = document.getElementById("rotY");
+    var sliderRotZ = document.getElementById("rotZ");
+    var sliderCamZ = document.getElementById("camZ");
+    var dispRotX = document.getElementById("rotValueX");
+    var dispRotY = document.getElementById("rotValueY");
+    var dispRotZ = document.getElementById("rotValueZ");
+    var dispCamZ = document.getElementById("camPosZ");
+    dispRotX.innerHTML = rotX;
+    dispRotY.innerHTML = rotY;
+    dispRotZ.innerHTML = rotZ;
+    dispCamZ.innerHTML = camZ;
+    sliderRotX.oninput = function() {
+        rotX = this.value;
+        dispRotX.innerHTML = rotX;
+        updateCanvas();
+    }
+    sliderRotY.oninput = function() {
+        rotY = this.value;
+        dispRotY.innerHTML = rotY;
+        updateCanvas();
+    }
+    sliderRotZ.oninput = function() {
+        rotZ = this.value;
+        dispRotZ.innerHTML = rotZ;
+        updateCanvas();
+    }
+    sliderCamZ.oninput = function() {
+        camZ = this.value/100;
+        dispCamZ.innerHTML = camZ;
+        updateCanvas();
+    }
+
+
+    //set correct sizes 
+    function setSizes () {
+        document.getElementById("myCanvas").setAttribute("width", size); 
+        document.getElementById("myCanvas").setAttribute("height", size); 
+    }
+
+
+    // create points and init canvas
+    setSizes();
+    createPoints();
+    updateCanvas();
+
+</script> 
+
+</body>
+</html>
