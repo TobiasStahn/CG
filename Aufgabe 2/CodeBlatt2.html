@@ -203,7 +203,7 @@ Your browser does not support the HTML5 canvas tag.</canvas>
                                0,1,0,0,
                                -Math.sin(rotZ*Math.PI/180),0,Math.cos(rotZ*Math.PI/180),0,
                                0,0,0,1);
-	transMat = transMat.mulMat(xrotMat.mulMat(yrotMat.mulMat(zrotMat)));
+	
 	
 	var c = new Point3D(0,0,camZ,1);
 	var r = new Vector3D(1,0,0);
@@ -214,6 +214,7 @@ Your browser does not support the HTML5 canvas tag.</canvas>
 								 0,1,0, -u.dot(c),
 								 0,0,-(-1),d.dot(c),
 								 0,0,0,1);
+     transMat =    transMat.mulMat(xrotMat.mulMat(yrotMat.mulMat(zrotMat)));
 	transMat = transMat.mulMat(lookAtMat);
 // END AUFGABE b
         
@@ -246,14 +247,14 @@ Your browser does not support the HTML5 canvas tag.</canvas>
 								   
 		var skalMat = new Matrix4D(size/3,0,0,0,
                                    0,size/3,0,0,
-                                   0,0,0,0,
+                                   0,0,1,0,
                                    0,0,0,1);
 								   
-		projMat = skalMat.mulMat(stdMat);
+		projMat = stdMat.mulMat(skalMat);
 		
         for (var i = 0; i < pointarray.length; i++) {
             var point = pointarray[i];
-            pointsProj[i] = projMat.mulVec(point);
+            pointsProj[i] = projMat.mulVec(point).dehomogen();
             
         }     
 // END AUFGABE c
