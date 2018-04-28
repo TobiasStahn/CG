@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+    .slidecontainer {
+     width: 500px;
+ }
+
+ .slider {
+     -webkit-appearance: none;
+     width: 100%;
+     height: 10px;
+ }
+</style>
+</head>
+<body>
+
+    <canvas id="myCanvas" width="500" height="500" style="border:1px solid #d3d3d3;" 
+    onmousedown="mouse_action(event, 1)" onmouseup="mouse_action(event, -1)"
+    onmousemove="mouse_action(event, 0)">
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+<div>
+    Zeichne Linien: <input type="checkbox" id="dlines" value="c" onclick="lineCheckBoxFunction()">
+    Zeichne Dreiecke: <input type="checkbox" id="dtriangles" onclick="triangleCheckBoxFunction()">
+    Sortiere Dreiecke: <input type="checkbox" id="striangles" value="c" onclick="sortCheckBoxFunction()">
+</div>
+
+
+<script type="text/javascript">
+const size = 500; // Size of canvas
+var c = document.getElementById("myCanvas");
+var ctx = c.getContext("2d");
+
+// 3dpoint prototype
+function Point3D (x=0, y=0, z=0, w=1)  {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = w;
+
+    // dehomogenize point
+    this.dehomogen = function () {
+        var p = new Point3D();
+        p.x = this.x/this.w;
+        p.y = this.y/this.w;
+        p.z = this.z/this.w;
+        p.w = 1;
+        return p;
+    }
+}
+
+
+// 3d vector
+function Vector3D (x=0, y=0, z=0)  {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+
+    // matrix vector product
+    this.cross = function (v) {
+        var c = new Vector3D();
+        c.x = this.y * v.z - this.z * v.y;
+        c.y = this.z * v.x - this.x * v.z;
+        c.z = this.x * v.y - this.y * v.x;
+        return c;
+    }   
+
+    // normalize vector
+    this.normalize = function() {
+        var norm = Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z);
+        var v = new Vector3D(this.x/norm, this.y/norm, this.z/norm);
+        return v;
+    }
+
+    // dot product
+    this.dot = function (v) {
+        return this.x * v.x + this.y * v.y + this.z * v.z;
+    }
+}
+
+
+// 4d matrix protoype
+function Matrix4D (xx = 1, yx = 0, zx = 0, wx = 0,
+   xy = 0, yy = 1, zy = 0, wy = 0,
+   xz = 0, yz = 0, zz = 1, wz = 0,
+   xw = 0, yw = 0, zw = 0, ww = 1) {
+    this.xx = xx;
+    this.yx = yx;
+    this.zx = zx;
+    this.wx = wx;
+    this.xy = xy;
+    this.yy = yy;
+    this.zy = zy;
+    this.wy = wy;
+    this.xz = xz;
+    this.yz = yz;
+    this.zz = zz;
+    this.wz = wz;
+    this.xw = xw;
+    this.yw = yw;
+    this.zw = zw;
+    this.ww = ww;
+    // matrix multiplication
+    this.mulMat = function (m) {
+        var n = new Matrix4D ();
+        n.xx = m.xx * this.xx + m.xy * this.yx + m.xz * this.zx + m.xw * this.wx;
+        n.xy = m.xx * this.xy + m.xy * this.yy + m.xz * this.zy + m.xw * this.wy;
+        n.xz = m.xx * this.xz + m.xy * this.yz + m.xz * this.zz + m.xw * this.wz;
+        n.xw = m.xx * this.xw + m.xy * this.yw + m.xz * this.zw + m.xw * this.ww;
+        n.yx = m.yx * this.xx + m.yy * this.yx + m.yz * this.zx + m.yw * this.wx;
+        n.yy = m.yx * this.xy + m.yy * this.yy + m.yz * this.zy + m.yw * this.wy;
+        n.yz = m.yx * this.xz + m.yy * this.yz + m.yz * this.zz + m.yw * this.wz;
+        n.yw = m.yx * this.xw + m.yy * this.yw + m.yz * this.zw + m.yw * this.ww;
+        n.zx = m.zx * this.xx + m.zy * this.yx + m.zz * this.zx + m.zw * this.wx;
+        n.zy = m.zx * this.xy + m.zy * this.yy + m.zz * this.zy + m.zw * this.wy;
+        n.zz = m.zx * this.xz + m.zy * this.yz + m.zz * this.zz + m.zw * this.wz;
+        n.zw = m.zx * this.xw + m.zy * this.yw + m.zz * this.zw + m.zw * this.ww;
+        n.wx = m.wx * this.xx + m.wy * this.yx + m.wz * this.zx + m.ww * this.wx;
+        n.wy = m.wx * this.xy + m.wy * this.yy + m.wz * this.zy + m.ww * this.wy;
+        n.wz = m.wx * this.xz + m.wy * this.yz + m.wz * this.zz + m.ww * this.wz;
+        n.ww = m.wx * this.xw + m.wy * this.yw + m.wz * this.zw + m.ww * this.ww;
+        return n;
+    }
+
+    // matrix vector product
+    this.mulVec = function (pIn) {
+        var p = new Point3D();
+        p.x = pIn.x * this.xx + pIn.y * this.yx + pIn.z * this.zx + pIn.w * this.wx;
+        p.y = pIn.x * this.xy + pIn.y * this.yy + pIn.z * this.zy + pIn.w * this.wy;
+        p.z = pIn.x * this.xz + pIn.y * this.yz + pIn.z * this.zz + pIn.w * this.wz;
+        p.w = pIn.x * this.xw + pIn.y * this.yw + pIn.z * this.zw + pIn.w * this.ww;
+        return p;
+    }   
+}
+
+
+var id = ctx.createImageData(1,1); 
+var d  = id.data;                 
+// Draw point at x,y with given color and radius
+function drawPoint (x, y, color=[0,0,0]) {
+    var xc = x + 0.5*size;
+    var yc = y + 0.5*size;
+    d[0]   = color[0];
+    d[1]   = color[1];
+    d[2]   = color[2];
+    d[3]   = 255;
+    ctx.putImageData( id, xc, yc );  
+}
+
+
+////// Line Methods /////
+
+// 3d line 
+function Line3D (startpoint=new Point3D(), endpoint=new Point3D()) {
+    // deepcopy, to prevent side effects if lines would share points
+    this.sp = new Point3D(startpoint.x, startpoint.y, startpoint.z, startpoint.w);
+    this.ep = new Point3D(endpoint.x, endpoint.y, endpoint.z, endpoint.w);
+}
+
+
+
+// Create array of Lines
+var linearray = [];
+function createLines () {
+// BEGIN AUFGABE a TEIL 1
+var nur = new Point3D(100,100,100,1);
+var nul = new Point3D(-100,100,100,1);
+var nbr = new Point3D(100,-100,100,1);
+var nbl = new Point3D(-100,-100,100,1);
+
+var fur = new Point3D(100,100,-100,1);
+var ful = new Point3D(-100,100,-100,1);
+var fbr = new Point3D(100,-100,-100,1);
+var fbl = new Point3D(-100,-100,-100,1);
+
+linearray.push(new Line3D(nur,nul));
+linearray.push(new Line3D(nur,nbr));
+linearray.push(new Line3D(nur,fur));
+linearray.push(new Line3D(nbl,nul));
+linearray.push(new Line3D(nbl,nbr));
+linearray.push(new Line3D(nbl,fbl));
+linearray.push(new Line3D(ful,nul));
+linearray.push(new Line3D(ful,fbl));
+linearray.push(new Line3D(ful,fur));
+linearray.push(new Line3D(fbr,fbl));
+linearray.push(new Line3D(fbr,fur));
+linearray.push(new Line3D(fbr,nbr));
+
+// END AUFGABE a TEIL 1
+}
+
+var rotX = 0;
+var rotY = 0;
+var rotZ = 0;
+// transform array of lines
+function transformLines (linearray) {
+    var transMat = mouseRotMat;
+
+    var linesTrans = [];
+    for (var i = 0; i < linearray.length; i++) {
+        var line = linearray[i];
+        var spTrans = transMat.mulVec(line.sp);
+        var epTrans = transMat.mulVec(line.ep);
+        linesTrans.push(new Line3D(spTrans, epTrans));
+    }
+    
+    return linesTrans;
+}
+
+
+// project array of lines
+function projectLines (linearray) { 
+    var ez = 0.8*size;
+    var projMat = new Matrix4D(1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,-1/ez,1);
+
+    var linesProj = [];
+    for (var i = 0; i < linearray.length; i++) {
+        var line = linearray[i];
+        var spTrans = projMat.mulVec(line.sp);
+        var epTrans = projMat.mulVec(line.ep);
+        linesProj.push(new Line3D(spTrans, epTrans));
+    }
+    
+    return linesProj;
+}
+
+
+// draw line
+function drawLine (line) {
+    var startpoint = (line.sp).dehomogen();
+    var endpoint = (line.ep).dehomogen();
+// BEGIN TESTCODE
+drawPoint(startpoint.x, startpoint.y);
+drawPoint(endpoint.x, endpoint.y);
+// END TESTCODE
+// BEGIN AUFGABE a TEIL 2
+
+if(startpoint.x == endpoint.x){ //senkrechte Geraden
+    var start;
+    var end;
+    if(startpoint.y <= endpoint.y){ // Zuordnung fallend oder steigend (nachunten, nachoben)
+        start = startpoint.y;
+        end = endpoint.y;    
+    }
+    else{
+        start = endpoint.y;
+        end = startpoint.y;   
+    }
+    var i;
+    for(i = start; i < end; i++){
+        drawPoint(startpoint.x, i);
+    }
+}
+
+else{
+    var startx;
+    var starty;
+    var endx;
+    var endy;
+    if(startpoint.x < endpoint.x){
+        startx = startpoint.x;
+        starty = startpoint.y;
+        endx = endpoint.x;
+        endy = endpoint.y;
+    }
+    else{
+        startx = endpoint.x;
+        starty = endpoint.y;
+        endx = startpoint.x;
+        endy = startpoint.y;
+    }
+        var m = (endy - starty)/(endx - startx);
+        var t = starty-(m*startx);
+        
+
+        if(m >= -1 && m <= 1){ //flache Gerade
+            var i;
+            for(i = startx; i < endx; i++){
+                drawPoint(i, Math.round(m*i+t));
+            }
+        }
+        else{ //steile Gerade
+            var i;
+            var ay;
+            var by;
+            if(starty <= endy){ // Zuordnung fallend oder steigend
+                ay = starty;
+                by = endy;
+            }
+            else{
+                ay = endy;
+                by = starty;
+            }
+
+            for(i = ay; i < by; i++){
+                drawPoint(Math.round((i-t)/m), i);
+            }
+        }
+    
+}
+
+
+
+
+
+
+// END AUFGABE a TEIL 2
+}
+
+
+// draw lines in linearray
+function drawLines (linearray) {
+    for (var i = 0; i < linearray.length; i++) {
+        drawLine(linearray[i]);
+    }
+}
+
+
+////// Triangle Methods //////
+
+// 3d triangle
+function Triangle3D (A=new Point3D, B=new Point3D(), C=new Point3D(), color=[0,0,0,255]) {
+    // deepcopy, to prevent side effects if lines would share points
+    this.A = new Point3D(A.x, A.y, A.z, A.w);
+    this.B = new Point3D(B.x, B.y, B.z, B.w);
+    this.C = new Point3D(C.x, C.y, C.z, C.w);
+    this.color = color;
+}
+
+
+// Create array of Triangles
+var trianglearray = [];
+function createTriangles () {
+// BEGIN AUFGABE b TEIL 1
+
+// END AUFGABE b TEIL 1
+}
+
+
+// transform array of triangles
+function transformTriangles (trianglearray) {
+    var transMat = mouseRotMat;
+
+    var trianglesTrans = [];
+    for (var i = 0; i < trianglearray.length; i++) {
+        var triangle = trianglearray[i];
+        var ATrans = transMat.mulVec(triangle.A);
+        var BTrans = transMat.mulVec(triangle.B);
+        var CTrans = transMat.mulVec(triangle.C);
+        trianglesTrans.push(new Triangle3D(ATrans, BTrans, CTrans, triangle.color));
+    }
+    
+    return trianglesTrans;
+}
+
+
+// project array of triangles
+function projectTriangles (trianglearray) { 
+    var ez = 0.8*size;
+    var projMat = new Matrix4D(1,0,0,0,
+        0,1,0,0,
+        0,0,1,0,
+        0,0,-1/ez,1);
+
+    var trianglesProj = [];
+    for (var i = 0; i < trianglearray.length; i++) {
+        var triangle = trianglearray[i];
+        var ATrans = projMat.mulVec(triangle.A);
+        var BTrans = projMat.mulVec(triangle.B);
+        var CTrans = projMat.mulVec(triangle.C);
+        trianglesProj.push(new Triangle3D(ATrans, BTrans, CTrans, triangle.color));
+    }
+    
+    return trianglesProj;
+}
+
+
+// draw triangle
+function drawTriangle (triangle) {
+    var A = (triangle.A).dehomogen();
+    var B = (triangle.B).dehomogen();
+    var C = (triangle.C).dehomogen();
+// BEGIN TEST CODE  
+drawPoint(A.x, A.y);
+drawPoint(B.x, B.y);
+drawPoint(C.x, C.y);
+// END TEST CODE    
+// BEGIN AUFGABE b TEIL 2    
+
+// END AUFGABE b TEIL 2    
+}
+
+
+// draw triangles in trianglearray
+var sortTri = false;
+function drawTriangles (trianglearray) {
+    if (sortTri) {
+        trianglearray.sort(function(a, b) {
+            return (a.A.z + a.B.z + a.C.z) - (b.A.z + b.B.z + b.C.z);
+        });
+    }
+    
+    for (var i = 0; i < trianglearray.length; i++) {
+        drawTriangle(trianglearray[i]);
+    }
+}
+
+
+// update canvas
+var showLines = true;
+var showTris = false;
+function updateCanvas () {
+    ctx.clearRect(0, 0, size, size);
+    if (showTris) {
+        var trianglesTrans = transformTriangles(trianglearray);
+        var trianglesProj = projectTriangles(trianglesTrans);
+        drawTriangles(trianglesProj);
+    } 
+    if (showLines) {
+        var linesTrans = transformLines(linearray);
+        var linesProj = projectLines(linesTrans);
+        drawLines(linesProj);
+    }
+}
+
+
+// mouse funcionality
+var mouseDown = false;
+var mouseXOld = 0;
+var mouseYOld = 0;
+var mouseRotMat = new Matrix4D();
+function mouse_action(event, clicked) {
+    if (clicked == 1) {
+        mouseDown = true;
+        mouseXOld = event.clientX;
+        mouseYOld = event.clientY;
+    } else if ( clicked == -1) {
+        mouseDown = false;
+    }
+
+    if (mouseDown) {
+        var mouseX = event.clientX;
+        var mouseY = event.clientY;
+        // check if mouse movement is at least one pixel of canvas
+        if ((mouseX != mouseXOld) || (mouseY != mouseYOld)) {
+            var x1 = mouseXOld - 0.5*size;
+            var y1 = mouseYOld - 0.5*size; 
+            var x2 = mouseX - 0.5*size;
+            var y2 = mouseY - 0.5*size;
+
+            // compute V
+            function computeV (x, y, r) {
+                if ((x*x + y*y) <= ((r*r)/2)) {
+                    var z = Math.sqrt(r*r - (x*x + y*y));
+                } else {
+                    var z = ((r*r)/2)/Math.sqrt(x*x + y*y);
+                }
+                var v = new Vector3D(x, y, z);
+                v = v.normalize();
+                return v;
+            }
+
+            // compute rotation axis and angle
+            var r = 0.2*size;
+            var v1 = computeV(x1, y1, r);
+            var v2 = computeV(x2, y2, r);
+            var n = v1.cross(v2);
+            n = n.normalize();
+            
+            // create rotation matrix corresponding to current mouse movement
+            var theta = Math.acos(v1.dot(v2));
+            var ct = Math.cos(theta);
+            var st = Math.sin(theta);
+            var rotMat = new Matrix4D(ct+n.x*n.x*(1-ct), n.x*n.y*(1-ct)-n.z*st, n.x*n.z*(1-ct)+n.y*st, 0,
+                n.y*n.x*(1-ct)+n.z*st, ct+n.y*n.y*(1-ct), n.y*n.z*(1-ct)-n.x*st, 0,
+                n.z*n.x*(1-ct)-n.y*st, n.z*n.y*(1-ct)+n.x*st, ct+n.z*n.z*(1-ct), 0,
+                0, 0, 0, 1);
+
+            // update rotation matrix of all mouse movements
+            mouseRotMat = rotMat.mulMat(mouseRotMat);
+
+            updateCanvas(mouseRotMat);
+            mouseXOld = mouseX;
+            mouseYOld = mouseY;
+        }
+    }
+}
+
+
+// checkbox functionality
+document.getElementById("dlines").checked = true;
+function lineCheckBoxFunction() {
+    var cB = document.getElementById("dlines");
+    showLines = cB.checked;
+    updateCanvas();
+}
+
+function triangleCheckBoxFunction() {
+    var cB = document.getElementById("dtriangles");
+    showTris = cB.checked;
+    updateCanvas();
+}
+
+function sortCheckBoxFunction() {
+    var cB = document.getElementById("striangles");
+    sortTri = cB.checked;
+    updateCanvas();
+}
+
+
+//set correct sizes 
+function setSizes () {
+    document.getElementById("myCanvas").setAttribute("width", size); 
+    document.getElementById("myCanvas").setAttribute("height", size); 
+}
+
+
+// create lines and triangles, init canvas
+setSizes();
+createLines();
+createTriangles();
+updateCanvas();
+
+</script> 
+
+</body>
+</html>
