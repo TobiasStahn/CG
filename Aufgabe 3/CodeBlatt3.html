@@ -337,6 +337,34 @@ function Triangle3D (A=new Point3D, B=new Point3D(), C=new Point3D(), color=[0,0
 var trianglearray = [];
 function createTriangles () {
 // BEGIN AUFGABE b TEIL 1
+var nur = new Point3D(100,100,100,1);
+var nul = new Point3D(-100,100,100,1);
+var nbr = new Point3D(100,-100,100,1);
+var nbl = new Point3D(-100,-100,100,1);
+
+var fur = new Point3D(100,100,-100,1);
+var ful = new Point3D(-100,100,-100,1);
+var fbr = new Point3D(100,-100,-100,1);
+var fbl = new Point3D(-100,-100,-100,1);
+
+trianglearray.push(new Triangle3D(nbr,nur,nul,[255,0,0,255]));
+trianglearray.push(new Triangle3D(nul,nbl,nbr,[255,0,0,255]));
+
+trianglearray.push(new Triangle3D(ful,fur,fbr,[0,255,0,255]));
+trianglearray.push(new Triangle3D(fbr,fbl,ful,[0,255,0,255]));
+
+trianglearray.push(new Triangle3D(ful,nul,fur,[0,0,255,255]));
+trianglearray.push(new Triangle3D(fur,nul,nur,[0,0,255,255]));
+
+trianglearray.push(new Triangle3D(nbl,fbl,fbr,[0,100,100,255]));
+trianglearray.push(new Triangle3D(fbr,nbr,nbl,[0,100,100,255]));
+
+trianglearray.push(new Triangle3D(fbr,fur,nur,[120,100,100,255]));
+trianglearray.push(new Triangle3D(nur,nbr,fbr,[120,100,100,255]));
+
+trianglearray.push(new Triangle3D(nul,ful,fbl,[100,6,47,255]));
+trianglearray.push(new Triangle3D(fbl,nbl,nul,[100,6,47,255]));
+
 
 // END AUFGABE b TEIL 1
 }
@@ -391,6 +419,58 @@ drawPoint(B.x, B.y);
 drawPoint(C.x, C.y);
 // END TEST CODE    
 // BEGIN AUFGABE b TEIL 2    
+    
+    var tri = [A,B,C];
+
+    var i;
+
+    var r = A;
+    var l = A;
+    var u = A;
+    var b = A;
+
+    for(i = 0; i < tri.length; i++){
+        if(r.x < tri[i].x){
+            r = tri[i];
+        }
+        if(l.x > tri[i].x){
+            l = tri[i];
+        }
+        if(u.y < tri[i].y){
+            u = tri[i];
+        }
+        if(b.y > tri[i].y){
+            b = tri[i];
+        }
+    }
+    //upperleft/bottomright corner of smallest rectangle enclosing the triangle
+    var ul = new Point3D(l.x,u.y,0,1); 
+    var br = new Point3D(r.x,b.y,0,1);
+
+    var x;
+    var y;
+
+    A_abc = Math.round((A.x*(B.y - C.y) + B.x*(C.y - A.y) + C.x*(A.y - B.y))/2);
+    
+    for(x = ul.x; x < br.x; x++){
+        for(y = br.y; y < ul.y; y++){
+            A_pbc = Math.round((x*(B.y - C.y) + B.x*(C.y - y) + C.x*(y - B.y))/2);
+            A_apc = Math.round((A.x*(y - C.y) + x*(C.y - A.y) + C.x*(A.y - y))/2);
+            A_abp = Math.round((A.x*(B.y - y) + B.x*(y - A.y) + x*(A.y - B.y))/2);
+
+
+            //point is not in triangle, if one is negative 
+            if(A_pbc > 0 && A_apc > 0 && A_abp > 0){
+                drawPoint(x,y, triangle.color);
+            }
+        }
+
+    }
+
+    
+
+
+
 
 // END AUFGABE b TEIL 2    
 }
