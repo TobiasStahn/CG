@@ -92,7 +92,12 @@
               uniform mat4 uProjectionMatrix;
   
 // BEGIN MUSTERLOESUNG AUFGABE 2b
-
+              void main(void) {
+                gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+                vec4 vPosition = vec4(1, 1, 1, 1);
+                vec4 vNormal = normalize(aVertexNormal);
+                vec3 vColor = aVertexColor;
+              }
 // END MUSTERLOESUNG AUFGABE 2b
             `;
   
@@ -293,7 +298,21 @@
             ];
   
 // BEGIN MUSTERLOESUNG AUFGABE 2a
-  
+            const positionBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+
+            const normalBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
+
+            const colorBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
+
+            const indexBuffer = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 // END MUSTERLOESUNG AUFGABE 2a
   
             return {
