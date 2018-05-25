@@ -92,11 +92,14 @@
               uniform mat4 uProjectionMatrix;
   
 // BEGIN MUSTERLOESUNG AUFGABE 2b
+              vec4 vPosition;
+              vec4 vNormal;
+              vec3 vColor;
               void main(void) {
-                gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-                vec4 vPosition = vec4(1, 1, 1, 1);
-                vec4 vNormal = normalize(aVertexNormal);
-                vec3 vColor = aVertexColor;
+                gl_Position = uProjectionMatrix * aVertexPosition;
+                vPosition = aVertexPosition;
+                vNormal = normalize(uNormalMatrix * aVertexNormal);
+                vColor = aVertexColor;
               }
 // END MUSTERLOESUNG AUFGABE 2b
             `;
@@ -125,7 +128,16 @@
                     gl_FragColor = vec4(0,0,0,1);
 
 // BEGIN MUSTERLOESUNG AUFGABE 2c
+                vec3 ca = uCAmbient * vColor;
+                vec3 cd = uCDiffuse * vColor;
+                vec3 cs = uCSpecular * vec3(1, 1, 1);
+                vec3 l = normalize(uLightPos - vPosition);
+                vec3 v = normalize(uCamPos - vPosition);
+                vec3 h = normalize(v + l);
 
+                vec3 color = (ca + cd * (dot(l, vNormal) + cs * pow((dot(h, vNormal)), uShine))) * uLightColor;
+
+                gl_FragColor = vec4(color, 1);
 // END MUSTERLOESUNG AUFGABE 2c
                 }
             `;
