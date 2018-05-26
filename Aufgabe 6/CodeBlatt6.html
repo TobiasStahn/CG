@@ -92,14 +92,15 @@
               uniform mat4 uProjectionMatrix;
   
 // BEGIN MUSTERLOESUNG AUFGABE 2b
-              vec4 vPosition;
-              vec4 vNormal;
-              vec3 vColor;
+              varying vec3 vPosition;
+              varying  vec3 vNormal;
+               varying vec3 vColor;
+
               void main(void) {
-                gl_Position = uProjectionMatrix * aVertexPosition;
-                vPosition = aVertexPosition;
-                vNormal = normalize(uNormalMatrix * aVertexNormal);
-                vColor = aVertexColor;
+                gl_Position = uProjectionMatrix*uModelViewMatrix * aVertexPosition;
+                vPosition= (uModelViewMatrix*aVertexPosition).xyz;
+                vNormal = normalize((uNormalMatrix * aVertexNormal).xyz);
+                vColor = aVertexColor.xyz;
               }
 // END MUSTERLOESUNG AUFGABE 2b
             `;
@@ -131,13 +132,15 @@
                 vec3 ca = uCAmbient * vColor;
                 vec3 cd = uCDiffuse * vColor;
                 vec3 cs = uCSpecular * vec3(1, 1, 1);
+
                 vec3 l = normalize(uLightPos - vPosition);
                 vec3 v = normalize(uCamPos - vPosition);
                 vec3 h = normalize(v + l);
 
-                vec3 color = (ca + cd * (dot(l, vNormal) + cs * pow((dot(h, vNormal)), uShine))) * uLightColor;
-
-                gl_FragColor = vec4(color, 1);
+                vec3 color = (ca + cd*max(dot(l,vNormal),0.0) + cs*max(((pow((dot(h,vNormal)),uShine))),0.0)) * uLightColor;
+                
+                gl_FragColor = vec4(color, 1.0);
+                
 // END MUSTERLOESUNG AUFGABE 2c
                 }
             `;
@@ -323,8 +326,8 @@
             gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(colors), gl.STATIC_DRAW);
 
             const indexBuffer = gl.createBuffer();
-            gl.bindBuffer(gl.ARRAY_BUFFER, indexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 // END MUSTERLOESUNG AUFGABE 2a
   
             return {
