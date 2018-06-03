@@ -152,7 +152,10 @@
 
 
 // BEGIN AUFGABE 2 TEIL 4
-                    gl_FragColor = texture2D(myTexture, vTexCoord);
+                    highp vec3 vLighting = ambientTerm + diffuseTerm * (dot(l, vNormal) + specularTerm * pow(dot(h, vNormal), uShine));
+
+                    highp vec4 texelColor = texture2D(myTexture, vTexCoord);
+                    gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
 // END AUFGABE 2 TEIL 4
                 }
             `;
