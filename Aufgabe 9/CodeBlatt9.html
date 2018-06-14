@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+.slidecontainer {
+	width: 500px;
+}
+
+.slider {
+	-webkit-appearance: none;
+	width: 100%;
+	height: 10px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="myCanvas" width="500" height="500" style="border:1px solid #d3d3d3;" 
+    onmousedown="mouse_action(event, 1)" onmouseup="mouse_action(event, -1)"
+    onmousemove="mouse_action(event, 0)">
+Your browser does not support the HTML5 canvas tag.</canvas>
+
+<div class="slidecontainer">
+<p>t: <span id="t"></span></p>
+    <input type="range" min="0" max="1" value="0.5" step="0.01" class="slider" id="sliderT">
+</div>
+<div>
+Aufgabe 1 und 2 (Bezier Kurve) : <input type="checkbox" id="dcurve" value="c" onclick="curveCheckBoxFunction()">
+</div>
+<div>
+Bonusaufgabe (Bezier Fl&auml;che) : <input type="checkbox" id="darea" onclick="areaCheckBoxFunction()">
+</div>
+<div>
+Verschiebe Punkte : <input type="checkbox" id="movePoints" onclick="moveCheckBoxFunction()">
+</div>
+
+
+<script type="text/javascript">
+    const size = 500; // Size of canvas
+    var c = document.getElementById("myCanvas");
+    var ctx = c.getContext("2d");
+
+    // t for frame position
+    var tFrame = 0.5;
+
+    // 3dpoint prototype
+    function Point3D (x=0, y=0, z=0, w=1)  {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.w = w;
+
+        // dehomogenize point
+        this.dehomogen = function () {
+            var p = new Point3D();
+            p.x = this.x/this.w;
+            p.y = this.y/this.w;
+            p.z = this.z/this.w;
+            p.w = 1;
+            return p;
+        }
+
+        // substract two points 
+        this.substract = function (p) {
+            var pOut = new Point3D();
+            pOut.x = this.x - p.x;
+            pOut.y = this.y - p.y;
+            pOut.z = this.z - p.z;
+            pOut.w = this.w - p.w;
+            return pOut;
+        }
+
+        // add two points
+        this.add = function (p) {
+            var pOut = new Point3D();
+            pOut.x = this.x + p.x;
+            pOut.y = this.y + p.y;
+            pOut.z = this.z + p.z;
+            pOut.w = this.w + p.w;
+            return pOut;
+        }
+
+        // multiply by scalar 
+        this.mul = function (s) {
+            var pOut = new Point3D();
+            pOut.x = this.x * s;
+            pOut.y = this.y * s;
+            pOut.z = this.z * s;
+            pOut.w = this.w * s;
+            return pOut;
+        }
+    }
+
+
+    // 3d vector
+    function Vector3D (x=0, y=0, z=0)  {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+
+        // matrix vector product
+        this.cross = function (v) {
+            var c = new Vector3D();
+            c.x = this.y * v.z - this.z * v.y;
+            c.y = this.z * v.x - this.x * v.z;
+            c.z = this.x * v.y - this.y * v.x;
+            return c;
+        }   
+
+        // normalize vector
+        this.normalize = function() {
+            var norm = Math.sqrt(this.x*this.x + this.y*this.y + this.z*this.z);
+            var v = new Vector3D(this.x/norm, this.y/norm, this.z/norm);
+            return v;
+        }
+
+        // dot product
+        this.dot = function (v) {
+            return this.x * v.x + this.y * v.y + this.z * v.z;
+        }
+    }
+
+
+    // 4d matrix protoype
+    function Matrix4D (xx = 1, yx = 0, zx = 0, wx = 0,
+                       xy = 0, yy = 1, zy = 0, wy = 0,
+                       xz = 0, yz = 0, zz = 1, wz = 0,
+                       xw = 0, yw = 0, zw = 0, ww = 1) {
+        this.xx = xx;
+        this.yx = yx;
+        this.zx = zx;
+        this.wx = wx;
+        this.xy = xy;
+        this.yy = yy;
+        this.zy = zy;
+        this.wy = wy;
+        this.xz = xz;
+        this.yz = yz;
+        this.zz = zz;
+        this.wz = wz;
+        this.xw = xw;
+        this.yw = yw;
+        this.zw = zw;
+        this.ww = ww;
+        // matrix multiplication
+        this.mulMat = function (m) {
+            var n = new Matrix4D ();
+            n.xx = m.xx * this.xx + m.xy * this.yx + m.xz * this.zx + m.xw * this.wx;
+            n.xy = m.xx * this.xy + m.xy * this.yy + m.xz * this.zy + m.xw * this.wy;
+            n.xz = m.xx * this.xz + m.xy * this.yz + m.xz * this.zz + m.xw * this.wz;
+            n.xw = m.xx * this.xw + m.xy * this.yw + m.xz * this.zw + m.xw * this.ww;
+            n.yx = m.yx * this.xx + m.yy * this.yx + m.yz * this.zx + m.yw * this.wx;
+            n.yy = m.yx * this.xy + m.yy * this.yy + m.yz * this.zy + m.yw * this.wy;
+            n.yz = m.yx * this.xz + m.yy * this.yz + m.yz * this.zz + m.yw * this.wz;
+            n.yw = m.yx * this.xw + m.yy * this.yw + m.yz * this.zw + m.yw * this.ww;
+            n.zx = m.zx * this.xx + m.zy * this.yx + m.zz * this.zx + m.zw * this.wx;
+            n.zy = m.zx * this.xy + m.zy * this.yy + m.zz * this.zy + m.zw * this.wy;
+            n.zz = m.zx * this.xz + m.zy * this.yz + m.zz * this.zz + m.zw * this.wz;
+            n.zw = m.zx * this.xw + m.zy * this.yw + m.zz * this.zw + m.zw * this.ww;
+            n.wx = m.wx * this.xx + m.wy * this.yx + m.wz * this.zx + m.ww * this.wx;
+            n.wy = m.wx * this.xy + m.wy * this.yy + m.wz * this.zy + m.ww * this.wy;
+            n.wz = m.wx * this.xz + m.wy * this.yz + m.wz * this.zz + m.ww * this.wz;
+            n.ww = m.wx * this.xw + m.wy * this.yw + m.wz * this.zw + m.ww * this.ww;
+            return n;
+        }
+
+        // matrix vector product
+        this.mulVec = function (pIn) {
+            var p = new Point3D();
+            p.x = pIn.x * this.xx + pIn.y * this.yx + pIn.z * this.zx + pIn.w * this.wx;
+            p.y = pIn.x * this.xy + pIn.y * this.yy + pIn.z * this.zy + pIn.w * this.wy;
+            p.z = pIn.x * this.xz + pIn.y * this.yz + pIn.z * this.zz + pIn.w * this.wz;
+            p.w = pIn.x * this.xw + pIn.y * this.yw + pIn.z * this.zw + pIn.w * this.ww;
+            return p;
+        }   
+    }
+
+
+    var id = ctx.createImageData(1,1); 
+    var d  = id.data;                 
+    // Draw point at x,y with given color and radius
+    function drawPoint (point, hexcolor='#000000', radius=1) {
+        pp = projectPoint(point);
+        ctx.beginPath();
+        ctx.arc(pp.x + 0.5*size, pp.y + 0.5*size, radius, 0, 2 * Math.PI, false);
+        ctx.fillStyle = hexcolor;
+        ctx.fill();
+    }    
+
+
+    // 3d line 
+    function Line3D (startpoint=new Point3D(), endpoint=new Point3D()) {
+        // deepcopy, to prevent side effects if lines would share points
+        this.sp = new Point3D(startpoint.x, startpoint.y, startpoint.z, startpoint.w);
+        this.ep = new Point3D(endpoint.x, endpoint.y, endpoint.z, endpoint.w);
+    }
+
+
+    // draw line
+    function drawLine (line, color='#000000') {
+        
+        function drawLinePoint(x, y, hexcolor='#000000', radius = 0.002*size) {
+            ctx.beginPath();
+            ctx.arc(x + 0.5*size, y + 0.5*size, radius, 0, 2 * Math.PI, false);
+            ctx.fillStyle = hexcolor;
+            ctx.fill();
+        }
+
+        var startpoint = projectPoint(line.sp);
+        var endpoint = projectPoint(line.ep);
+        var x0 = startpoint.x;
+        var y0 = startpoint.y;
+        var x1 = endpoint.x;
+        var y1 = endpoint.y;
+
+        var steep = Math.abs(y1 - y0) > Math.abs(x1 - x0);
+        var tmp;
+        if (steep) {
+            tmp=x0; x0=y0; y0=tmp;
+            tmp=x1; x1=y1; y1=tmp;
+        }
+
+        if (x0 > x1) {
+            var sign = -1;
+            x0 *= -1;
+            x1 *= -1;
+        } else {
+            var sign = 1;
+        }
+
+        var dx = x1 - x0;
+        var dy = Math.abs(y1 - y0);
+        var error = ((dx / 2));
+
+        if (y0 < y1) {
+            var ystep = 1;
+        } else {
+            var ystep = -1;
+        }
+        var y = y0;
+
+        for(var x=x0;x<=x1;x++){
+            if (!steep) {
+                drawLinePoint(sign*x, y, hexcolor=color);
+            } else {
+                drawLinePoint(y, sign*x, hexcolor=color);
+            }
+            error = (error - dy);
+            if (error < 0) {
+              y += ystep;
+              error += dx;
+            }
+        }
+    }
+
+
+    // Cubic Bezier curve
+    function BezierCurve (p0=new Point3D(), p1=new Point3D(), p2=new Point3D(), p3=new Point3D()) {
+
+        this.p0 = new Point3D(p0.x, p0.y, p0.z, p0.w);
+        this.p1 = new Point3D(p1.x, p1.y, p1.z, p1.w);
+        this.p2 = new Point3D(p2.x, p2.y, p2.z, p2.w);
+        this.p3 = new Point3D(p3.x, p3.y, p3.z, p3.w);
+
+// BEGIN AUFGABE a
+
+// END AUFGABE a
+
+
+// BEGIN AUFGABE b
+
+// END AUFGABE b
+    }
+
+
+    // Create array of Curves
+    var curvesarray = [];
+    function createCurves () {
+        var l = 0.2*size;
+        var p00 = new Point3D(-l,0.5*l,0);
+        var p01 = new Point3D(-l,-0.5*l,0);
+        var p02 = new Point3D(l,-0.5*l,0);
+        var p03 = new Point3D(l,0.5*l,0);
+
+        var p10 = new Point3D(-l,0.5*l,-0.1*size);
+        var p11 = new Point3D(l,-0.5*l,-0.1*size);
+        var p12 = new Point3D(-l,-0.5*l,-0.1*size);
+        var p13 = new Point3D(l,0.5*l,-0.1*size);
+
+        var p20 = new Point3D(-l,-0.5*l,-0.2*size);
+        var p21 = new Point3D(-l,0.5*l,-0.2*size);
+        var p22 = new Point3D(-l,0.5*l,-0.2*size);
+        var p23 = new Point3D(l,-0.5*l,-0.2*size);
+
+        var p30 = new Point3D(-l,-0.5*l,-0.3*size);
+        var p31 = new Point3D(-l,0.5*l,-0.3*size);
+        var p32 = new Point3D(l,0.5*l,-0.3*size);
+        var p33 = new Point3D(l,-0.5*l,-0.3*size);
+
+        curvesarray.push(new BezierCurve(p00, p01, p02, p03));
+        curvesarray.push(new BezierCurve(p10, p11, p12, p13));
+        curvesarray.push(new BezierCurve(p20, p21, p22, p23));
+        curvesarray.push(new BezierCurve(p30, p31, p32, p33));
+    }
+
+
+    var rotX = 0;
+    var rotY = 0;
+    var rotZ = 0;
+    // transform array of curves
+    function transformCurves (curvesarray) {
+        var transMat = mouseRotMat;
+
+        var curvesTrans = [];
+        for (var i = 0; i < curvesarray.length; i++) {
+            var curve = curvesarray[i];
+            var p0 = transMat.mulVec(curve.p0);
+            var p1 = transMat.mulVec(curve.p1);
+            var p2 = transMat.mulVec(curve.p2);
+            var p3 = transMat.mulVec(curve.p3);
+            curvesTrans.push(new BezierCurve(p0, p1, p2, p3));
+        }
+        
+        return curvesTrans;
+    }
+
+    // project point
+    function projectPoint (point) { 
+        var ex = 0;
+        var ey = 0;
+        var ez = 0.8*size;
+        var projMat = new Matrix4D(1,0,-ex/ez,0,
+                                0,1,-ey/ez,0,
+                                0,0,1,0,
+                                0,0,-1/ez,1);
+
+        return projMat.mulVec(point).dehomogen();
+    }
+
+
+    // draw curves in curvesarray
+    function drawCurves (curvesarray) {
+        if (showCurve) {
+            // single curve and frame, aufgabe 1+2
+            for (var i = 0; i < curvesarray.length; i++) {
+                curvesarray[i].drawFrame(tFrame);
+                curvesarray[i].drawCurve();
+            }
+        } else {
+            // area, bonusaufgabe
+            for (var i = 0; i < curvesarray.length; i++) {
+                curvesarray[i].drawCurve();
+            }
+        }
+    }
+
+
+    // update canvas
+    // true for Aufgabe1, false for Bonusaufgabe
+    var showCurve = true;
+    function updateCanvas () {
+        ctx.clearRect(0, 0, size, size);
+        if (showCurve) {
+            var curves = [curvesarray[0]];
+            var curvesTrans = transformCurves(curves);
+            drawCurves(curvesTrans);
+        }
+        else {
+            var curvesTrans = transformCurves(curvesarray);
+// BEGIN BONUSAUFGABE
+         
+// END BONUSAUFGABE
+        }
+    }
+        
+
+    // mouse funcionality
+    var movePoints = true;
+    var mouseDown = false;
+    var mouseXOld = 0;
+    var mouseYOld = 0;
+    var mouseRotMat = new Matrix4D();
+    var nearestPoint;
+    var nearesDist;
+    var nearesIndex;
+    function mouse_action(event, clicked) {
+        if (clicked == 1) {
+            mouseDown = true;
+            mouseXOld = event.clientX;
+            mouseYOld = event.clientY;
+
+            // find nearest point
+            if (movePoints) {   
+                var xM = mouseXOld - 0.5*size;
+                var yM = mouseYOld - 0.5*size; 
+                function distance (x1 ,x2 ,y1 ,y2) {
+                   return Math.sqrt(Math.pow((x1-x2),2) + Math.pow((y1-y2),2));
+                }
+                // get nearest point of curvepoints to a given point
+                function getNearestPoint (c, x, y) {
+                    var d0 = distance(x, c.p0.x, y, c.p0.y);
+                    var d1 = distance(x, c.p1.x, y, c.p1.y);
+                    var d2 = distance(x, c.p2.x, y, c.p2.y);
+                    var d3 = distance(x, c.p3.x, y, c.p3.y);
+
+                    var nDist = d0;
+                    var nPoint = 0;
+                    if (d1 < nDist) {
+                        nDist = d1;
+                        nPoint = 1;
+                    } 
+                    if (d2 < nDist) {
+                        nDist = d2;
+                        nPoint = 2;
+                    } 
+                    if (d3 < nDist) {
+                        nDist = d3;
+                        nPoint = 3;
+                    }
+
+                    return [nPoint, nDist];
+                } 
+
+                nearestDist = Infinity;
+                for (var i = 0; i < curvesarray.length; i++) {
+                    var c = curvesarray[i]; 
+                    var cnearest = getNearestPoint(c, xM, yM);
+
+                    if (cnearest[1] < nearestDist) {
+                        nearestDist = cnearest[1];
+                        nearestPoint = cnearest[0];
+                        nearestIndex = i;
+                    }
+                }
+            }
+        } else if ( clicked == -1) {
+            mouseDown = false;
+        }
+
+        if (mouseDown) {
+            var mouseX = event.clientX;
+            var mouseY = event.clientY;
+            // check if mouse movement is at least one pixel of canvas
+            if ((mouseX != mouseXOld) || (mouseY != mouseYOld)) {
+                var x1 = mouseXOld - 0.5*size;
+                var y1 = mouseYOld - 0.5*size; 
+                var x2 = mouseX - 0.5*size;
+                var y2 = mouseY - 0.5*size;
+
+                if (movePoints) {
+                // move nearest point
+                    var deltaX = mouseX - mouseXOld;
+                    var deltaY = mouseY - mouseYOld;
+
+                    if (nearestPoint == 0) {
+                        curvesarray[nearestIndex].p0.x += deltaX;
+                        curvesarray[nearestIndex].p0.y += deltaY;
+                    } else if (nearestPoint == 1) {
+                        curvesarray[nearestIndex].p1.x += deltaX;
+                        curvesarray[nearestIndex].p1.y += deltaY;
+                    } else if (nearestPoint == 2) {
+                        curvesarray[nearestIndex].p2.x += deltaX;
+                        curvesarray[nearestIndex].p2.y += deltaY;
+                    } else {
+                        curvesarray[nearestIndex].p3.x += deltaX;
+                        curvesarray[nearestIndex].p3.y += deltaY;
+                    }
+
+
+
+                } else {
+                    // rotate with virtual trackball
+                    // compute V
+                    function computeV (x, y, r) {
+                        if ((x*x + y*y) <= ((r*r)/2)) {
+                            var z = Math.sqrt(r*r - (x*x + y*y));
+                        } else {
+                            var z = ((r*r)/2)/Math.sqrt(x*x + y*y);
+                        }
+                        var v = new Vector3D(x, y, z);
+                        v = v.normalize();
+                        return v;
+                    }
+
+                    // compute rotation axis and angle
+                    var r = 0.2*size;
+                    var v1 = computeV(x1, y1, r);
+                    var v2 = computeV(x2, y2, r);
+                    var n = v1.cross(v2);
+                    n = n.normalize();
+                    
+                    // create rotation matrix corresponding to current mouse movement
+                    var theta = Math.acos(v1.dot(v2));
+                    var ct = Math.cos(theta);
+                    var st = Math.sin(theta);
+                    var rotMat = new Matrix4D(ct+n.x*n.x*(1-ct), n.x*n.y*(1-ct)-n.z*st, n.x*n.z*(1-ct)+n.y*st, 0,
+                                                n.y*n.x*(1-ct)+n.z*st, ct+n.y*n.y*(1-ct), n.y*n.z*(1-ct)-n.x*st, 0,
+                                                n.z*n.x*(1-ct)-n.y*st, n.z*n.y*(1-ct)+n.x*st, ct+n.z*n.z*(1-ct), 0,
+                                                0, 0, 0, 1);
+
+                    // update rotation matrix of all mouse movements
+                    mouseRotMat = rotMat.mulMat(mouseRotMat);
+                }
+
+                updateCanvas();
+                mouseXOld = mouseX;
+                mouseYOld = mouseY;
+            }
+        }
+    }
+
+
+    // checkbox functionality
+    document.getElementById("dcurve").checked = true;
+    function curveCheckBoxFunction() {
+        var cB = document.getElementById("dcurve");
+        showCurve = cB.checked;
+        document.getElementById("darea").checked = !showCurve;
+        updateCanvas();
+    }
+
+    document.getElementById("darea").checked = false;
+    function areaCheckBoxFunction() {
+        var cB = document.getElementById("darea");
+        showCurve = !cB.checked;
+        document.getElementById("dcurve").checked = showCurve;
+        updateCanvas();
+    }
+
+    document.getElementById("movePoints").checked = true;
+    function moveCheckBoxFunction() {
+        var cB = document.getElementById("movePoints");
+        movePoints = cB.checked;
+        updateCanvas();
+    }
+
+    
+    // slider t parameters
+    var sliderT = document.getElementById("sliderT");
+    var dispT = document.getElementById("t");
+    dispT.innerHTML = tFrame;
+    sliderT.oninput = function() {
+        tFrame = parseFloat(this.value);
+        dispT.innerHTML = tFrame;
+        updateCanvas();
+    }
+
+
+    //set correct sizes 
+    function setSizes () {
+        document.getElementById("myCanvas").setAttribute("width", size); 
+        document.getElementById("myCanvas").setAttribute("height", size); 
+    }
+
+
+    // create lines and triangles, init canvas
+    setSizes();
+    createCurves();
+    updateCanvas();
+
+</script> 
+
+</body>
+</html>
